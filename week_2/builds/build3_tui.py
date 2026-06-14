@@ -36,9 +36,10 @@ load_dotenv()
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=os.environ["OPENROUTER_API_KEY"],
+    timeout=30
 )
 
-MODEL = "deepseek/deepseek-v4-flash:free"
+MODEL = "openai/gpt-oss-20b:free"
 MAX_HISTORY_TURNS = 20   # keep last N user+assistant pairs
 
 # ---------------------------------------------------------------------------
@@ -50,8 +51,8 @@ def call_model(messages: list[dict]) -> str:
     Send the full messages list to the model and return the assistant's reply text.
     This is a blocking call. It must run in a worker thread in the TUI.
     """
-    # TODO: implement using client.chat.completions.create()
-    pass
+    response = client.chat.completions.create(model=MODEL, messages=messages)
+    return response.choices[0].message.content
 
 
 def trim_history(messages: list[dict], max_turns: int) -> list[dict]:
@@ -62,8 +63,14 @@ def trim_history(messages: list[dict], max_turns: int) -> list[dict]:
     Drop oldest pairs from messages[1:] when over the limit.
     A 'pair' is one user message + one assistant message = 2 entries.
     """
-    # TODO: implement
-    pass
+    system_message = messages[0]              # always keep the system prompt
+    conversation = messages[1:]               # everything after it
+
+    max_messages = max_turns * 2              # each turn = user + assistant = 2
+    if len(conversation) > max_messages:
+        conversation = conversation[-max_messages:]   # keep only the most recent
+
+    return [system_message] + conversation    # rebuild: system on top + recent convo
 
 
 # ---------------------------------------------------------------------------
@@ -134,10 +141,8 @@ class ChatApp(App):
         self.messages = trim_history(self.messages, MAX_HISTORY_TURNS)
 
         # Run the API call in a background thread so the UI stays responsive
-        # TODO: call self.run_worker(self._get_response(), thread=True)
-        pass
-
-    async def _get_response(self) -> None:
+        self.run_worker(self._get_response, thread=True)
+    def _get_response(self) -> None:
         """
         Fetch the model response and update the UI.
         This runs in a background thread (called via run_worker).
@@ -150,24 +155,27 @@ class ChatApp(App):
         Handle exceptions: if call_model raises, display an error in the log.
         """
         log = self.query_one("#log", RichLog)
-        # TODO: implement
-        pass
-
+        try:
+            reply = call_model(self.messages)
+            self.messages.append({"role": "assistant", "content": reply})
+            self.call_from_thread(log.write, f"[bold green][Agent][/bold green] {reply}\n")
+        except Exception as e:
+            self.call_from_thread(log.write, f"[bold red][Error][/bold red] {e}\n")
     # -----------------------------------------------------------------------
     # Actions (bound to keyboard shortcuts)
     # -----------------------------------------------------------------------
 
     def action_clear_display(self) -> None:
         """Clear the visible log without touching conversation history."""
-        # TODO: implement
-        pass
+        log = self.query_one("#log", RichLog)
+        log.clear()
 
     def action_clear_history(self) -> None:
         """Reset conversation history and clear the display."""
-        # TODO: reset self.messages to just the system message
-        # TODO: clear the display
-        # TODO: write a "History cleared." notice to the log
-        pass
+        self.messages = [{"role": "system", "content": "You are a helpful assistant."}]
+        log = self.query_one("#log", RichLog)
+        log.clear()
+        log.write("[bold yellow]History cleared.[/bold yellow]\n")
 
 
 # ---------------------------------------------------------------------------

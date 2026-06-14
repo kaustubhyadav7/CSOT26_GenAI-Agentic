@@ -23,6 +23,7 @@ Stretch goals (not required):
 
 import os
 import json
+import sys
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -31,9 +32,10 @@ load_dotenv()
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=os.environ["OPENROUTER_API_KEY"],
+    timeout=30,
 )
 
-MODEL = "deepseek/deepseek-v4-flash:free"
+MODEL = "openai/gpt-oss-20b:free"
 
 # ---------------------------------------------------------------------------
 # Tool schemas (the contract between you and the model)
@@ -101,18 +103,20 @@ def get_weather(city: str, unit: str = "celsius") -> dict:
     Return a dict like:
         {"city": city, "temperature": 28, "unit": unit, "condition": "partly cloudy"}
     """
-    # TODO: implement (hardcode some reasonable values)
-    pass
+    return {"city": city, "temperature": 28, "unit": unit, "condition": "partly cloudy"}
 
 
-def calculate(expression: str) -> dict:
+def calculate(expression: str):
     """
     Safely evaluate a math expression.
     Use eval() with restricted globals so imports and builtins are blocked.
-    Return {"result": value} or {"error": message}.
+    Returdn {"result": value} or {"error": message}.
     """
-    # TODO: implement
-    pass
+    try:
+        result = eval(expression, {"__builtins__": {}})
+        return {"result": result}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ---------------------------------------------------------------------------
@@ -137,9 +141,17 @@ def dispatch(tool_call) -> str:
 
     Note: tool_call.function.arguments is a *string*, not a dict. Parse it first.
     """
-    # TODO: implement
-    pass
+    name = tool_call.function.name                    # pull the name (already clean)
+    arguments = json.loads(tool_call.function.arguments)  # JSON string → dict
 
+    func = TOOL_REGISTRY.get(name)
+    if func is None:
+        return json.dumps({"error": f"Unknown tool: {name}"})
+    try:
+        result = func(**arguments)                    # call with unpacked args
+        return json.dumps(result)                     # dict result → JSON text
+    except Exception as e:
+        return json.dumps({"error": str(e)})
 
 # ---------------------------------------------------------------------------
 # Agent loop
@@ -182,9 +194,20 @@ def run_agent(user_message: str) -> str:
         message = response.choices[0].message
         finish_reason = response.choices[0].finish_reason
 
-        # TODO: handle finish_reason == "tool_calls"
-        # TODO: handle finish_reason == "stop"
-        pass
+        if finish_reason == "tool_calls":
+            messages.append(message)                      # record the assistant's tool request
+            for tool_call in message.tool_calls:          # may be several at once
+                print(f"[tool: {tool_call.function.name}]", file=sys.stderr)
+                result = dispatch(tool_call)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,          # tag which call this answers
+                    "content": result,
+                })
+            continue                                       # loop back, model reads results
+
+        if finish_reason == "stop":
+            return message.content                         # final answer
 
     return f"[Agent stopped after {MAX_ITERATIONS} iterations without a final answer]"
 

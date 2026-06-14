@@ -36,6 +36,7 @@ Before running, create a file called `sample.txt` with some text in it.
 import os
 import re
 import json
+import sys
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -46,7 +47,7 @@ client = OpenAI(
     api_key=os.environ["OPENROUTER_API_KEY"],
 )
 
-MODEL = "deepseek/deepseek-v4-flash:free"
+MODEL = "google/gemma-4-26b-a4b-it:free"
 
 SYSTEM_PROMPT = """You are a helpful file assistant with access to the following tools:
 
@@ -73,8 +74,12 @@ def read_file(path: str) -> dict:
     Return {"content": ..., "path": ...} on success.
     Return {"error": ...} if the file doesn't exist or can't be read.
     """
-    # TODO: implement using open() in a try/except
-    pass
+    try:
+        with open(path) as f:        # open the file
+            content = f.read()       # read everything inside into a string
+        return {"content": content, "path": path}   # success: hand back the text
+    except Exception as e:           # if anything went wrong (e.g. file missing)
+        return {"error": str(e)}     # failure: hand back the reason as text
 
 
 def write_file(path: str, content: str) -> dict:
@@ -85,8 +90,12 @@ def write_file(path: str, content: str) -> dict:
 
     Hint: open(path, 'w') and then f.write(content).
     """
-    # TODO: implement
-    pass
+    try:
+        with open(path, "w") as f:           # "w" = open for writing
+            bytes_written = f.write(content)  # write the text; f.write returns how many chars
+        return {"success": True, "path": path, "bytes_written": bytes_written}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ---------------------------------------------------------------------------
@@ -107,8 +116,13 @@ def parse_tool_call(response_text: str) -> dict | None:
 
     Hint: use re.search() with re.DOTALL to find the block, then json.loads() the body.
     """
-    # TODO: implement
-    pass
+    pattern = r"<tool_call>(.*?)</tool_call>"
+    match = re.search(pattern, response_text, re.DOTALL)
+    if match is None:                  # no tool call in the text
+        return None
+    json_text = match.group(1)         # the JSON string between the tags
+    data = json.loads(json_text)       # parse it into a Python dict
+    return data                        # {"name": ..., "arguments": {...}}
 
 
 def strip_tool_call(response_text: str) -> str:
@@ -116,8 +130,8 @@ def strip_tool_call(response_text: str) -> str:
     Return the response text with any <tool_call>...</tool_call> block removed.
     Useful for printing the model's prose without the raw tag.
     """
-    # TODO: implement (re.sub is your friend)
-    pass
+    pattern = r"<tool_call>.*?</tool_call>"
+    return re.sub(pattern, "", response_text, flags=re.DOTALL).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -139,8 +153,14 @@ def dispatch(name: str, arguments: dict) -> str:
 
     Always return a string (json.dumps the result dict).
     """
-    # TODO: implement
-    pass
+    func = TOOL_REGISTRY.get(name)            # look up the function by name
+    if func is None:                          # name not in registry
+        return json.dumps({"error": f"Unknown tool: {name}"})
+    try:
+        result = func(**arguments)            # call it with the arguments
+        return json.dumps(result)             # turn the dict result into TEXT
+    except Exception as e:
+        return json.dumps({"error": str(e)})
 
 
 # ---------------------------------------------------------------------------
@@ -177,8 +197,21 @@ def run_agent(user_message: str) -> str:
     ]
 
     for iteration in range(MAX_ITERATIONS):
-        # TODO: call the model, parse the response, dispatch or return
-        pass
+        response = client.chat.completions.create(model=MODEL, messages=messages)
+        reply = response.choices[0].message.content
+
+        tool_call = parse_tool_call(reply)
+
+        if tool_call is None:                    # assistant gave a final answer
+            return strip_tool_call(reply)
+
+        # assistant wants a tool — run it
+        print(f"[tool call: {tool_call['name']}]", file=sys.stderr)
+
+        result = dispatch(tool_call["name"], tool_call["arguments"])
+
+        messages.append({"role": "assistant", "content": reply})
+        messages.append({"role": "user", "content": f"<tool_response>\n{result}\n</tool_response>"})
 
     return f"[Agent stopped after {MAX_ITERATIONS} iterations]"
 
