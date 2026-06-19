@@ -25,34 +25,48 @@ BASE_PROMPT = "You are Research Desk, a helpful research assistant."
 
 
 def create_session() -> str:
-    """Return a new 8-char hex session ID."""
     os.makedirs(SESSIONS_DIR, exist_ok=True)
-    # TODO: initiate a new, empty session with a unique ID
-    pass
+    return uuid.uuid4().hex[:8]
 
 
 def save_session(session_id: str, messages: list, title: str = "Untitled") -> None:
-    """Write session JSON to .agent/sessions/{id}.json"""
-    # TODO: implement
-    pass
+    data = {
+        "id": session_id,
+        "title": title,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "messages": messages,
+    }
+    path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
 
 
 def load_session(session_id: str) -> dict:
-    """Load and return session dict including messages list."""
-    # TODO: implement
-    pass
+    path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
+    with open(path) as f:
+        return json.load(f)
 
 
 def list_sessions() -> list[dict]:
-    """Return sessions sorted by updated_at descending."""
-    # TODO: implement
-    pass
+    if not os.path.exists(SESSIONS_DIR):
+        return []
+    sessions = []
+    for fname in os.listdir(SESSIONS_DIR):
+        if fname.endswith(".json"):
+            sid = fname[:-5]
+            s = load_session(sid)
+            sessions.append({"id": s["id"], "title": s["title"], "updated_at": s["updated_at"]})
+    return sorted(sessions, key=lambda x: x["updated_at"], reverse=True)
 
 
 def build_system_prompt() -> str:
-    """Base prompt + AGENTS.md if it exists."""
-    # TODO: implement
-    pass
+    prompt = BASE_PROMPT
+    for path in AGENTS_PATHS:
+        if os.path.exists(path):
+            with open(path) as f:
+                prompt += "\n\n" + f.read()
+            break
+    return prompt
 
 
 if __name__ == "__main__":

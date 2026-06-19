@@ -1,0 +1,19 @@
+{
+  "id": "7d95644b",
+  "title": "Untitled",
+  "updated_at": "2026-06-18T10:30:39.493521+00:00",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are Research Desk, a helpful research assistant.\n\n# Research Desk Rules\n\n## Citations\n- Include source URLs inline: [title](url)\n- For papers: cite as [title](https://arxiv.org/abs/{arxiv_id})\n- Prefer primary sources (papers, official docs) over blog posts\n\n## Papers (required tools)\n- Use `paper_search` for ML research and literature questions\n- Use `read_paper` with the arxiv_id from search results \u00e2\u20ac\u201d do not guess IDs\n- If `read_paper` returns 404, fall back to `web_fetch` on arxiv.org/abs/...\n- Do not use web_search when paper_search is the right tool\n\n## Research notes\n- Save new content with `write_file` to `notes/`\n- Update existing notes with `read_file` then `edit_file` \u00e2\u20ac\u201d do not rewrite whole files unnecessarily\n- Use `edit_file` operations: `append` for new sections, `replace` to revise, `delete` to remove stale parts\n- Keep edits inside `notes/` unless the user explicitly asks otherwise\n- Use lowercase hyphenated filenames: `notes/topic-name.md`\n\n## Web search\n- Use `web_search` before `web_fetch` for non-paper questions\n- Do not fetch more than 3 pages per question unless the user asks for depth\n\n## Tone\n- Be concise in chat; put detail in the note files\n"
+    },
+    {
+      "role": "user",
+      "content": "What is reinforcement learning?"
+    },
+    {
+      "role": "assistant",
+      "content": "Reinforcement learning (RL) is a subfield of machine learning in which an agent learns to make sequential decisions by interacting with an environment. At each time step the agent observes a state \\(s_t\\), selects an action \\(a_t\\) according to a policy \\(\\pi\\), receives a scalar reward \\(r_t\\), and then transitions to a new state \\(s_{t+1}\\). The agent\u2019s goal is to learn a policy that maximizes the cumulative reward (often discounted) over time, balancing immediate gains against future benefits.  \nTypical RL formulations cast this as a Markov decision process (MDP) with transition dynamics \\(P(s_{t+1}\\mid s_t,a_t)\\) and reward function \\(R(s_t,a_t)\\). Learning involves estimating value functions (expected returns) or directly optimizing the policy (policy\u2011gradient methods), using techniques such as Q\u2011learning, actor\u2011critic, or Monte\u2011Carlo tree search.  \n\nSources  \n- Sutton, R.S. & Barto, A.G. *Reinforcement Learning: An Introduction*, 2nd ed. (2018).  \n- Mnih, V. *et al.* \u201cHuman-level control through deep reinforcement learning.\u201d *Nature* 518, 2015."
+    }
+  ]
+}
