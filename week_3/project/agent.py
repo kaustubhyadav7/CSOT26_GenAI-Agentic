@@ -257,11 +257,11 @@ class Agent:
         return "Max iterations reached."
 
     def dispatch(self, tool_call) -> str:
-      name = tool_call.function.name
-      try:
-        args = json.loads(tool_call.function.arguments)
-      except json.JSONDecodeError:
-        return json.dumps({"error": "Malformed tool arguments from model"})
+        name = tool_call.function.name
+        try:
+            args = json.loads(tool_call.function.arguments)
+        except json.JSONDecodeError:
+            return json.dumps({"error": "Malformed tool arguments from model"})
         func = TOOL_REGISTRY.get(name)
         if func:
             try:
